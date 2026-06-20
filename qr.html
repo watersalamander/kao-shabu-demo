@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAO Shabu-Grill — Scan to Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:#15110F;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Sans Thai',system-ui,sans-serif;padding:32px;color:#F5F1EC;}
+  .card{background:#FAF7F2;color:#211C19;width:420px;max-width:100%;border-radius:32px;padding:38px 38px 32px;
+    text-align:center;box-shadow:0 40px 90px -30px rgba(0,0,0,.6);}
+  .logo{width:120px;height:120px;object-fit:contain;margin:0 auto 4px;display:block;}
+  .brand{font-weight:700;font-size:24px;letter-spacing:.3px;}
+  .tag{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#8a8077;margin-top:4px;}
+  .qrwrap{background:#fff;border-radius:24px;padding:20px;margin:24px auto 18px;display:inline-block;box-shadow:0 2px 10px rgba(0,0,0,.08);}
+  .qrwrap img{width:280px;height:280px;display:block;}
+  .h1{font-size:26px;font-weight:700;}
+  .h2{font-size:16px;color:#6B6259;margin-top:2px;}
+  .table{display:inline-flex;align-items:center;gap:8px;background:#1b1714;color:#fff;border-radius:12px;
+    padding:9px 16px;margin-top:18px;}
+  .table .lbl{font-family:'IBM Plex Mono';font-size:10px;letter-spacing:2px;color:#9a8f85;text-transform:uppercase;}
+  .table .val{font-family:'IBM Plex Mono';font-weight:700;font-size:18px;}
+  .url{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#a79e93;word-break:break-all;}
+  .langs{margin-top:8px;font-size:13px;color:#8a8077;}
+  @media print{ body{background:#fff;} .card{box-shadow:none;} }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="assets/logo-hero.png" alt="KAO Shabu-Grill">
+    <div class="brand">KAO Shabu-Grill</div>
+    <div class="tag">Shabu &amp; Grill Buffet</div>
+
+    <div class="qrwrap"><img src="kao-customer-qr.png" alt="Scan to order"></div>
+
+    <div class="h1">สแกนเพื่อสั่งอาหาร</div>
+    <div class="h2">Scan to order · 扫码点餐</div>
+
+    <div class="table"><span class="lbl">Table</span><span class="val">A12</span></div>
+
+    <div class="langs">ไทย · English · 中文</div>
+    <div class="url">watersalamander.github.io/kao-shabu-demo/customer.html</div>
+  </div>
+</body>
+</html>
