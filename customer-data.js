@@ -1,0 +1,91 @@
+// Auto-extracted verbatim from the KAO Shabu-Grill customer design (multilingual).
+const I=(no,th,en,zh,sold)=>({id:'i'+no,no:no,th:th,en:en,zh:zh,sold:!!sold});
+const DICT={
+      th:{ welcome:'ยินดีต้อนรับ', pickLang:'เลือกภาษา', start:'เริ่มสั่งอาหาร', tableLabel:'โต๊ะ', timeLeft:'เหลือเวลา', min:'นาที',
+        add:'เพิ่ม', soldOut:'หมด', photoTag:'รูปอาหาร', thisRound:'รอบนี้', itemsUnit:'รายการ', review:'ดู & ส่ง',
+        yourRound:'ออร์เดอร์รอบนี้', send:'ส่งออร์เดอร์', sent:'ส่งออร์เดอร์แล้ว!',
+        preparing:'กำลังเตรียม', otw:'กำลังนำมาเสิร์ฟ', delivered:'เสิร์ฟแล้ว',
+        menuNav:'เมนู', mealNav:'มื้อของฉัน', callNav:'เรียกพนักงาน', againRound:'สั่งทั้งรอบซ้ำ',
+        leftover:'กรุณาทานให้หมดนะคะ — อาหารเหลือเกิน 200 กรัม มีค่าปรับ ฿100', water:'ขอน้ำเปล่า', broth:'ขอน้ำซุปเพิ่ม', bill:'เช็คบิล',
+        callTitle:'ต้องการความช่วยเหลือ?', requestSent:'แจ้งพนักงานแล้ว กำลังไปหาคุณค่ะ',
+        noOrders:'ยังไม่มีออร์เดอร์', noOrdersHint:'ออร์เดอร์ที่ส่งจะแสดงที่นี่', roundLabel:'รอบที่', timeUp:'ใกล้หมดเวลารับประทานแล้ว' },
+      en:{ welcome:'Welcome', pickLang:'Choose language', start:'Start ordering', tableLabel:'Table', timeLeft:'Time left', min:'min',
+        add:'Add', soldOut:'Sold out', photoTag:'food photo', thisRound:'this round', itemsUnit:'items', review:'Review & send',
+        yourRound:'This round', send:'Send order', sent:'Order sent!',
+        preparing:'Preparing', otw:'On the way', delivered:'Delivered',
+        menuNav:'Menu', mealNav:'My meal', callNav:'Call staff', againRound:'Reorder this round',
+        leftover:'Please finish your food — leftovers over 200g add a ฿100 charge.', water:'Water', broth:'More broth', bill:'Bill / Check',
+        callTitle:'Need a hand?', requestSent:'Staff notified — on their way',
+        noOrders:'No orders yet', noOrdersHint:'Orders you send will appear here', roundLabel:'Round', timeUp:'Your dining time is almost up' },
+      zh:{ welcome:'欢迎光临', pickLang:'选择语言', start:'开始点餐', tableLabel:'桌', timeLeft:'剩余', min:'分钟',
+        add:'添加', soldOut:'售罄', photoTag:'食物照片', thisRound:'本轮', itemsUnit:'项', review:'查看并送出',
+        yourRound:'本轮订单', send:'送出订单', sent:'订单已送出！',
+        preparing:'备餐中', otw:'上菜中', delivered:'已送达',
+        menuNav:'菜单', mealNav:'我的用餐', callNav:'呼叫服务', againRound:'整轮再点一次',
+        leftover:'请尽量吃完 — 剩余超过200克将加收 ฿100。', water:'白开水', broth:'加汤底', bill:'结账',
+        callTitle:'需要帮助吗？', requestSent:'已通知服务员，马上就来',
+        noOrders:'还没有订单', noOrdersHint:'送出的订单会显示在这里', roundLabel:'第', timeUp:'用餐时间快到了' },
+    };
+const MENU=[
+      {key:'beef', th:'เนื้อ', en:'Beef', zh:'牛肉', items:[
+        I(11,'เนื้อสไลซ์','Sliced beef','牛肉片'),
+        I(12,'เนื้อวากิว A5','Wagyu A5','和牛A5',true),
+        I(13,'เนื้อสันคอลายหินอ่อน','Marbled chuck','雪花牛'),
+        I(14,'เนื้อสันนอก','Beef sirloin','西冷牛'),
+        I(15,'ลูกชิ้นเนื้อ','Beef ball','牛肉丸'),
+        I(16,'เนื้อเสือร้องไห้','Beef brisket','牛胸肉')]},
+      {key:'pork', th:'หมู', en:'Pork', zh:'猪肉', items:[
+        I(21,'หมูสไลซ์','Sliced pork','猪肉片'),
+        I(22,'หมูสามชั้น','Pork belly','五花肉'),
+        I(23,'คอหมู','Pork collar','梅花肉'),
+        I(24,'ลูกชิ้นหมู','Pork ball','猪肉丸'),
+        I(25,'หมูหมักงา','Sesame pork','芝麻腌猪')]},
+      {key:'sea', th:'ทะเล', en:'Seafood', zh:'海鲜', items:[
+        I(31,'กุ้งสด','Fresh shrimp','鲜虾'),
+        I(32,'ปลาหมึก','Squid','鱿鱼'),
+        I(33,'หอยแมลงภู่','Mussel','青口'),
+        I(34,'ปลาสไลซ์','Fish slice','鱼片'),
+        I(35,'ปูอัด','Crab stick','蟹棒'),
+        I(36,'ลูกชิ้นปลา','Fish ball','鱼丸')]},
+      {key:'veg', th:'ผัก', en:'Vegetables', zh:'蔬菜', items:[
+        I(41,'ผักกาดขาว','Napa cabbage','大白菜'),
+        I(42,'ผักบุ้ง','Morning glory','空心菜',true),
+        I(43,'เห็ดเข็มทอง','Enoki mushroom','金针菇'),
+        I(44,'เห็ดหอม','Shiitake','香菇'),
+        I(45,'ข้าวโพดอ่อน','Baby corn','玉米笋'),
+        I(46,'เต้าหู้ไข่','Egg tofu','蛋豆腐'),
+        I(47,'ฟักทอง','Pumpkin','南瓜')]},
+      {key:'noodle', th:'เส้น & ข้าว', en:'Noodles & rice', zh:'面 & 饭', items:[
+        I(51,'วุ้นเส้น','Glass noodles','冬粉'),
+        I(52,'บะหมี่','Egg noodles','蛋面'),
+        I(53,'อูด้ง','Udon','乌冬面'),
+        I(54,'มาม่า','Instant noodles','方便面',true),
+        I(55,'ข้าวสวย','Steamed rice','白饭')]},
+      {key:'broth', th:'น้ำซุป', en:'Broths', zh:'汤底', items:[
+        I(61,'ซุปกระดูกหมูใส','Clear pork broth','清汤'),
+        I(62,'ซุปต้มยำ','Tom yum broth','冬阴汤'),
+        I(63,'ซุปสุกี้','Sukiyaki broth','寿喜烧汤'),
+        I(64,'ซุปหม่าล่า','Mala broth','麻辣汤')]},
+      {key:'side', th:'ทานเล่น', en:'Sides', zh:'小食', items:[
+        I(71,'เกี๊ยวกุ้ง','Shrimp dumpling','虾饺'),
+        I(72,'เต้าหู้ทอด','Fried tofu','炸豆腐'),
+        I(73,'ไข่นกกระทา','Quail egg','鹌鹑蛋'),
+        I(74,'เต้าหู้ปลา','Fish tofu','鱼豆腐'),
+        I(75,'เกี๊ยวหมู','Pork wonton','猪肉馄饨')]},
+      {key:'sauce', th:'น้ำจิ้ม', en:'Dipping sauces', zh:'蘸酱', items:[
+        I(81,'น้ำจิ้มสุกี้','Suki sauce','火锅蘸酱'),
+        I(82,'น้ำจิ้มซีฟู้ด','Seafood sauce','海鲜酱'),
+        I(83,'น้ำจิ้มแจ่ว','Spicy jaew','辣酱'),
+        I(84,'น้ำจิ้มงา','Sesame sauce','芝麻酱')]},
+      {key:'drink', th:'เครื่องดื่ม', en:'Drinks', zh:'饮料', items:[
+        I(91,'ชาเย็น','Thai iced tea','泰式奶茶'),
+        I(92,'น้ำอัดลม','Soft drink','汽水'),
+        I(93,'โซดา','Soda water','苏打水'),
+        I(94,'น้ำเปล่า','Water','白开水'),
+        I(95,'ชามะนาว','Iced lemon tea','柠檬茶')]},
+    ];
+const STATUS={
+      preparing:{bg:'#FBF1DC',fg:'#A9750F',dot:'#C8841F'},
+      otw:{bg:'#E6EEF6',fg:'#2C5B8C',dot:'#2C6FB0'},
+      delivered:{bg:'#E6F0E8',fg:'#2F6B43',dot:'#3E7C52'},
+    };

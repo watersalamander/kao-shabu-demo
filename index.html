@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAO Shabu-Grill — Staff App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Lao:wght@400;500;600;700&family=Noto+Sans+Myanmar:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#3a3833;border-radius:4px;}
+  body{background:#cdcac4;font-family:'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;}
+  @keyframes kNew{0%,100%{box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 0 rgba(218,63,53,0);}50%{box-shadow:0 2px 8px rgba(0,0,0,.25),0 0 0 5px rgba(218,63,53,.4);}}
+  @keyframes kDot{0%,100%{opacity:1;}50%{opacity:.35;}}
+  button{font-family:inherit;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="data.js"></script>
+<script>
+  // Force the classic JSX runtime (global React.createElement). The default
+  // @babel/standalone react preset uses the automatic runtime, which emits
+  // `import` statements that break inside a classic <script>.
+  Babel.registerPreset('classic-react', {
+    plugins: [[Babel.availablePlugins['transform-react-jsx'], { runtime: 'classic' }]]
+  });
+</script>
+
+<script type="text/babel" data-presets="classic-react">
+const { useState, useEffect, useRef } = React;
+
+// Parse an inline-style string ("a:b;c:d;") into a React style object so we can
+// reuse the design's exact styling verbatim.
+function S(str){
+  const o={};
+  if(!str) return o;
+  for(const decl of str.split(';')){
+    const i=decl.indexOf(':');
+    if(i<0) continue;
+    let k=decl.slice(0,i).trim();
+    const v=decl.slice(i+1).trim();
+    if(!k) continue;
+    k=k.replace(/-([a-z])/g,(m,c)=>c.toUpperCase());
+    o[k]=v;
+  }
+  return o;
+}
+
+const Icon = {
+  check:(w)=> <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="m5 13 4 4L19 7"/></svg>,
+  clock:(w)=> <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+};
+
+function Photo({no,style}){
+  return <img src={"assets/food/"+no+".png"} alt="" loading="lazy"
+    style={Object.assign({position:'absolute',top:0,left:0,width:'100%',height:'100%',objectFit:'cover'},style||{})}/>;
+}
+
+function ageColor(sec){ if(sec<90) return '#36915C'; if(sec<210) return '#D69319'; return '#DA3F35'; }
+function ageStr(sec){ const m=Math.floor(sec/60), s=sec%60; return m+':'+('0'+s).slice(-2); }
+const findItem = (no)=> MENU.find(m=>m.no===no);
+
+const now0 = Date.now();
+const mk = (id,table,round,ageSec,its,status)=>({
+  id, table, round, createdAt: now0-ageSec*1000, status: status||'new',
+  items: its.map(x=>({no:x[0], qty:x[1], checked:!!x[2]}))
+});
+
+function App(){
+  const [view,setView]   = useState('prep');
+  const [lang,setLang]   = useState('my');
+  const [soundOn,setSound]= useState(true);
+  const [now,setNow]     = useState(now0);
+  const [soldOut,setSoldOut] = useState({12:true});
+  const [seq,setSeq]     = useState(7);
+  const [orders,setOrders] = useState([
+    mk('o1',15,1,18,[[55,2],[21,2],[46,1],[83,2]],'new'),
+    mk('o2',7,2,52,[[11,2],[41,1],[51,1]],'new'),
+    mk('o3',12,1,128,[[22,3,true],[62,1],[31,2]],'prep'),
+    mk('o4',3,3,238,[[31,4,true],[35,2,true],[91,2]],'prep'),
+    mk('o5',9,2,40,[[12,1],[32,2],[71,3]],'ready'),
+    mk('o6',5,1,360,[[53,2],[63,1],[94,2]],'done'),
+  ]);
+
+  const ac = useRef(null);
+  const soundRef = useRef(soundOn);
+  soundRef.current = soundOn;
+  const stateRef = useRef();
+  stateRef.current = { orders, soldOut, seq };
+
+  function beep(){
+    try{
+      if(!ac.current) ac.current = new (window.AudioContext||window.webkitAudioContext)();
+      const a=ac.current, o=a.createOscillator(), g=a.createGain();
+      o.connect(g); g.connect(a.destination); o.type='sine'; o.frequency.value=880;
+      g.gain.setValueAtTime(.0001,a.currentTime);
+      g.gain.exponentialRampToValueAtTime(.18,a.currentTime+.02);
+      g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+.35);
+      o.start(); o.stop(a.currentTime+.36);
+    }catch(e){}
+  }
+
+  function inject(){
+    const { orders, soldOut, seq } = stateRef.current;
+    const active = orders.filter(o=>o.status==='new'||o.status==='prep');
+    if(active.length>=8) return;
+    const pool = MENU.filter(m=>!soldOut[m.no]);
+    const n = 2+Math.floor(Math.random()*3);
+    const picks=[]; const used={};
+    for(let i=0;i<n;i++){
+      const m=pool[Math.floor(Math.random()*pool.length)];
+      if(used[m.no]) continue; used[m.no]=1;
+      picks.push({no:m.no, qty:1+Math.floor(Math.random()*3), checked:false});
+    }
+    const table=2+Math.floor(Math.random()*18);
+    const id='o'+(seq+1);
+    setOrders(s=>[{id, table, round:1+Math.floor(Math.random()*3), createdAt:Date.now(), status:'new', items:picks}].concat(s));
+    setSeq(x=>x+1);
+    if(soundRef.current) beep();
+  }
+
+  useEffect(()=>{
+    const t=setInterval(()=>setNow(Date.now()),1000);
+    const j=setInterval(()=>inject(),15000);
+    return ()=>{ clearInterval(t); clearInterval(j); };
+  },[]);
+
+  function toggleLine(oid,no){
+    setOrders(s=>s.map(o=>{
+      if(o.id!==oid) return o;
+      const items=o.items.map(it=>it.no===no?Object.assign({},it,{checked:!it.checked}):it);
+      const anyChecked=items.some(it=>it.checked);
+      return Object.assign({},o,{items, status:(o.status==='new'&&anyChecked)?'prep':o.status});
+    }));
+  }
+  const ready   = (oid)=> setOrders(s=>s.map(o=>o.id===oid?Object.assign({},o,{status:'ready'}):o));
+  const deliver = (oid)=> setOrders(s=>s.map(o=>o.id===oid?Object.assign({},o,{status:'done'}):o));
+  const toggleSold = (no)=> setSoldOut(s=>{ const c=Object.assign({},s); if(c[no]) delete c[no]; else c[no]=true; return c; });
+  const toggleSound = ()=> setSound(s=>{ if(!s) beep(); return !s; });
+
+  const st = ST[lang];
+  const prepOrders = orders.filter(o=>o.status==='new'||o.status==='prep');
+  const runnerSrc  = orders.filter(o=>o.status==='ready');
+  const counts = { prep:prepOrders.length, runner:runnerSrc.length };
+
+  // ---- Top bar tabs ----
+  const VT_ON ="border:none;border-radius:9px;padding:8px 16px;font:600 14px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';background:#C5302B;color:#fff;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;";
+  const VT_OFF="border:none;border-radius:9px;padding:8px 16px;font:600 14px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';background:transparent;color:#a79e93;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;";
+  const LT_ON ="border:none;background:#C5302B;color:#fff;font:600 12px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';padding:6px 9px;cursor:pointer;";
+  const LT_OFF="border:none;background:transparent;color:#8a8077;font:600 12px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';padding:6px 9px;cursor:pointer;";
+
+  const viewTabs=[['prep',st.prep],['runner',st.runner],['admin',st.admin]].map(p=>{
+    const active=view===p[0]; const cnt=counts[p[0]];
+    return { key:p[0], label:p[1], active, count:cnt, show:(cnt!==undefined&&cnt>0),
+      style:(active?VT_ON:VT_OFF),
+      badgeStyle:"font:700 11px 'IBM Plex Mono';background:"+(active?'rgba(255,255,255,.25)':'#3a3833')+";color:"+(active?'#fff':'#cfc7bd')+";border-radius:999px;padding:1px 7px;min-width:18px;text-align:center;" };
+  });
+
+  const staffName=STAFF_NAMES[lang]; const staffInitial=(staffName||'A').slice(0,1);
+
+  return (
+  <div style={{width:1194,height:800,borderRadius:30,background:'#0c0b0a',padding:13,boxShadow:'0 50px 100px -30px rgba(0,0,0,.55)'}}>
+   <div style={{width:'100%',height:'100%',borderRadius:18,overflow:'hidden',background:'#1d1c1a',display:'flex',flexDirection:'column',position:'relative'}}>
+
+    {/* ===== TOP BAR ===== */}
+    <div style={{flex:'none',height:64,background:'#141311',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 18px',borderBottom:'1px solid #2a2823'}}>
+      <div style={{display:'flex',alignItems:'center',gap:14}}>
+        <div style={{width:40,height:40,borderRadius:11,background:'#000',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
+          <img src="assets/logo.png" alt="KAO" style={{width:46,height:46,objectFit:'contain',mixBlendMode:'lighten'}}/>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+          <span style={{font:"700 15px 'IBM Plex Sans Thai'",color:'#fff',letterSpacing:'.3px'}}>KAO Shabu-Grill</span>
+          <span style={{font:"500 11px 'IBM Plex Mono'",color:'#8a8077',letterSpacing:'1px',textTransform:'uppercase'}}>Back of house</span>
+        </div>
+      </div>
+
+      <div style={{display:'flex',background:'#221f1c',borderRadius:13,padding:4,gap:3}}>
+        {viewTabs.map(v=>(
+          <button key={v.key} onClick={()=>setView(v.key)} style={S(v.style)}>
+            {v.label}
+            {v.show && <span style={S(v.badgeStyle)}>{v.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      <div style={{display:'flex',alignItems:'center',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:6,background:'#221f1c',borderRadius:10,padding:'5px 9px'}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a8077" strokeWidth="2"><path d="M3 5h12M3 12h12M3 19h8"/><path d="M18 8l3 3-3 3"/></svg>
+          <div style={{display:'flex',background:'#15130f',borderRadius:7,overflow:'hidden'}}>
+            {LANG_LABELS.map(l=>(
+              <button key={l[0]} onClick={()=>setLang(l[0])} style={S(lang===l[0]?LT_ON:LT_OFF)}>{l[1]}</button>
+            ))}
+          </div>
+        </div>
+        <button onClick={toggleSound} style={S("width:38px;height:38px;border-radius:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;"+(soundOn?'background:#C5302B;color:#fff;':'background:#221f1c;color:#8a8077;'))}>
+          {soundOn
+            ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a3 3 0 0 1 0 6M18.5 6.5a7 7 0 0 1 0 11"/></svg>
+            : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>}
+        </button>
+        <div style={{display:'flex',alignItems:'center',gap:8,background:'#221f1c',borderRadius:10,padding:'5px 10px 5px 6px'}}>
+          <div style={{width:28,height:28,borderRadius:8,background:'#3a3833',color:'#e8e2d8',font:"700 13px 'IBM Plex Mono'",display:'flex',alignItems:'center',justifyContent:'center'}}>{staffInitial}</div>
+          <span style={{font:"600 12px 'IBM Plex Sans Thai'",color:'#cfc7bd'}}>{staffName}</span>
+        </div>
+      </div>
+    </div>
+
+    {/* ===== CONTENT ===== */}
+    <div style={{flex:1,overflowY:'auto',background:'#1d1c1a'}}>
+
+      {/* PREP */}
+      {view==='prep' && (
+        <div style={{padding:'18px 20px 28px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+            <span style={{font:"700 19px 'IBM Plex Sans Thai'",color:'#fff'}}>{st.prep}</span>
+            <span style={{background:'#2a2823',color:'#cfc7bd',borderRadius:999,padding:'5px 13px',font:"600 13px 'IBM Plex Sans Thai'",display:'flex',alignItems:'center',gap:7}}>
+              <span style={{fontFamily:"'IBM Plex Mono'",fontWeight:700,fontSize:15,color:'#fff'}}>{prepOrders.length}</span> {st.queue}
+            </span>
+          </div>
+
+          {prepOrders.length===0 && (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,padding:'90px 20px',textAlign:'center'}}>
+              <div style={{width:64,height:64,borderRadius:18,background:'#252320',display:'flex',alignItems:'center',justifyContent:'center',color:'#4f9b6b'}}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 13 4 4L19 7"/></svg>
+              </div>
+              <span style={{font:"600 16px 'IBM Plex Sans Thai'",color:'#8a8077'}}>{st.noOrders}</span>
+            </div>
+          )}
+
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16,alignItems:'start'}}>
+            {prepOrders.map(o=>{
+              const sec=Math.max(0,Math.floor((now-o.createdAt)/1000));
+              const acol=ageColor(sec); const isNew=o.status==='new';
+              const allChecked=o.items.every(it=>it.checked);
+              const cardStyle="background:#fff;border-radius:16px;overflow:hidden;display:flex;flex-direction:column;border-left:7px solid "+acol+";box-shadow:0 2px 8px rgba(0,0,0,.25);"+(isNew?'animation:kNew 1.5s ease-in-out infinite;':'');
+              return (
+                <div key={o.id} style={S(cardStyle)}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',padding:'14px 16px 10px'}}>
+                    <div style={{display:'flex',flexDirection:'column'}}>
+                      <span style={{font:"600 10px 'IBM Plex Mono'",letterSpacing:'2px',textTransform:'uppercase',color:'#a79e93'}}>{st.table}</span>
+                      <span style={{font:"700 44px/0.95 'IBM Plex Mono'",color:'#1b1714',letterSpacing:'-1px'}}>{o.table}</span>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:7}}>
+                      <span style={S("display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;font:700 11px 'IBM Plex Sans Thai';"+(isNew?'background:#DA3F35;color:#fff;':'background:#2D2B28;color:#cfc7bd;'))}>
+                        {isNew && <span style={{width:7,height:7,borderRadius:'50%',background:'#fff',display:'inline-block',animation:'kDot 1s infinite'}}/>}
+                        {isNew?st.new:st.inprog}
+                      </span>
+                      <span style={S("display:inline-flex;align-items:center;gap:5px;border-radius:8px;padding:4px 9px;font:700 14px 'IBM Plex Mono';color:#fff;background:"+acol+";")}>
+                        {Icon.clock(12)}{ageStr(sec)}
+                      </span>
+                      <span style={{font:"600 11px 'IBM Plex Mono'",color:'#a79e93'}}>{st.round} {o.round}</span>
+                    </div>
+                  </div>
+                  <div style={{padding:'0 12px'}}>
+                    {o.items.map(it=>{
+                      const m=findItem(it.no);
+                      return (
+                        <div key={it.no} style={S("display:flex;align-items:center;gap:12px;padding:9px 4px;border-top:1px solid #F2EDE5;"+(it.checked?'opacity:.45;':''))}>
+                          <div style={{position:'relative',width:56,height:56,flex:'none',borderRadius:11,background:'#ECE3D4',overflow:'hidden'}}>
+                            <Photo no={it.no}/>
+                            <span style={{position:'absolute',top:3,left:3,fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,fontSize:14,background:'#1b1714',color:'#fff',borderRadius:7,padding:'2px 6px',zIndex:1}}>{it.no}</span>
+                          </div>
+                          <div style={{flex:1,display:'flex',flexDirection:'column',gap:2,minWidth:0}}>
+                            <span style={{font:"600 16px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao'",color:'#1b1714',lineHeight:1.2}}>{m?m[lang]:('#'+it.no)}</span>
+                            <span style={{font:"700 20px 'IBM Plex Mono'",color:'#C5302B'}}>×{it.qty}</span>
+                          </div>
+                          <button onClick={()=>toggleLine(o.id,it.no)} style={S("flex:none;width:46px;height:46px;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;"+(it.checked?'background:#2F8A50;border:none;color:#fff;':'background:#fff;border:2px solid #d9d0c4;color:transparent;'))}>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 13 4 4L19 7"/></svg>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button onClick={()=>ready(o.id)} style={S("margin-top:8px;height:52px;border:none;display:flex;align-items:center;justify-content:center;gap:9px;font:700 16px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';color:#fff;cursor:pointer;background:"+(allChecked?'#2F8A50':'#2D2B28')+";")}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6"><path d="m5 13 4 4L19 7"/></svg>
+                    {st.markReady}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* RUNNER */}
+      {view==='runner' && (
+        <div style={{padding:'18px 20px 28px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+            <span style={{font:"700 19px 'IBM Plex Sans Thai'",color:'#fff'}}>{st.readyToServe}</span>
+            <span style={{background:'#2a2823',color:'#cfc7bd',borderRadius:999,padding:'5px 13px',font:"600 13px 'IBM Plex Sans Thai'",display:'flex',alignItems:'center',gap:7}}>
+              <span style={{fontFamily:"'IBM Plex Mono'",fontWeight:700,fontSize:15,color:'#fff'}}>{runnerSrc.length}</span> {st.queue}
+            </span>
+          </div>
+
+          {runnerSrc.length===0 && (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,padding:'90px 20px',textAlign:'center'}}>
+              <div style={{width:64,height:64,borderRadius:18,background:'#252320',display:'flex',alignItems:'center',justifyContent:'center',color:'#8a8077'}}>
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h13l-3-3M3 12l13 0-3 3"/></svg>
+              </div>
+              <span style={{font:"600 16px 'IBM Plex Sans Thai'",color:'#8a8077'}}>{st.noReady}</span>
+            </div>
+          )}
+
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            {runnerSrc.map(o=>(
+              <div key={o.id} style={{background:'#fff',borderRadius:16,boxShadow:'0 2px 10px rgba(0,0,0,.22)',display:'flex',alignItems:'stretch',overflow:'hidden',borderLeft:'7px solid #2F8A50'}}>
+                <div style={{flex:'none',width:128,background:'#F4F0E8',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,borderRight:'1px solid #ECE6DD'}}>
+                  <span style={{font:"600 10px 'IBM Plex Mono'",letterSpacing:'2px',textTransform:'uppercase',color:'#a79e93'}}>{st.table}</span>
+                  <span style={{font:"700 56px/0.9 'IBM Plex Mono'",color:'#1b1714',letterSpacing:'-2px'}}>{o.table}</span>
+                  <span style={{font:"600 11px 'IBM Plex Mono'",color:'#a79e93'}}>{st.round} {o.round}</span>
+                </div>
+                <div style={{flex:1,padding:'16px 14px',display:'flex',flexWrap:'wrap',gap:10,alignContent:'center'}}>
+                  {o.items.map(p=>(
+                    <div key={p.no} style={{position:'relative',width:78,height:78,borderRadius:12,background:'#ECE3D4',overflow:'hidden'}}>
+                      <Photo no={p.no}/>
+                      <span style={{position:'absolute',top:4,left:4,fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,fontSize:14,background:'#1b1714',color:'#fff',borderRadius:7,padding:'2px 7px',zIndex:1}}>{p.no}</span>
+                      <span style={{position:'absolute',bottom:4,right:4,fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,fontSize:15,background:'#C5302B',color:'#fff',borderRadius:8,padding:'2px 8px'}}>×{p.qty}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={()=>deliver(o.id)} style={{flex:'none',width:172,border:'none',background:'#2F8A50',color:'#fff',font:"700 18px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao'",display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:8,cursor:'pointer'}}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="m5 13 4 4L19 7"/></svg>
+                  {st.delivered}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN */}
+      {view==='admin' && (()=>{
+        const tmap={};
+        orders.forEach(o=>{ const k=o.table; if(!tmap[k]) tmap[k]={table:o.table,rounds:0,total:0,items:{}}; tmap[k].rounds++; o.items.forEach(it=>{ tmap[k].items[it.no]=(tmap[k].items[it.no]||0)+it.qty; tmap[k].total+=it.qty; }); });
+        const tally=Object.keys(tmap).map(k=>tmap[k]).sort((a,b)=>a.table-b.table);
+        return (
+        <div style={{padding:'18px 20px 28px',display:'flex',gap:16,alignItems:'flex-start'}}>
+          <div style={{flex:'1.35',background:'#262420',borderRadius:16,padding:'16px 18px'}}>
+            <div style={{font:"700 17px 'IBM Plex Sans Thai'",color:'#fff',marginBottom:14}}>{st.availability}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {MENU.map(m=>{
+                const sold=!!soldOut[m.no];
+                return (
+                  <div key={m.no} style={S("display:flex;align-items:center;gap:11px;background:"+(sold?'#211f1c':'#1d1c1a')+";border-radius:12px;padding:9px 11px;"+(sold?'opacity:.62;':''))}>
+                    <div style={{position:'relative',width:46,height:46,flex:'none',borderRadius:10,background:'#ECE3D4',overflow:'hidden'}}>
+                      <Photo no={m.no}/>
+                      <span style={{position:'absolute',top:2,left:2,fontFamily:"'IBM Plex Mono',monospace",fontWeight:700,fontSize:11,background:'#1b1714',color:'#fff',borderRadius:6,padding:'1px 5px',zIndex:1}}>{m.no}</span>
+                    </div>
+                    <span style={S("flex:1;font:600 14px 'IBM Plex Sans Thai','Noto Sans Myanmar','Noto Sans Lao';color:"+(sold?'#8a8077':'#e8e2d8')+";"+(sold?'text-decoration:line-through;':''))}>{m[lang]}</span>
+                    <button onClick={()=>toggleSold(m.no)} style={S("flex:none;width:48px;height:28px;border-radius:999px;border:none;cursor:pointer;position:relative;transition:background .15s;background:"+(sold?'#3a3833':'#C5302B')+";")}>
+                      <span style={{position:'absolute',top:3,left:(sold?3:23),width:22,height:22,borderRadius:'50%',background:'#fff',transition:'left .15s'}}/>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{flex:1,background:'#262420',borderRadius:16,padding:'16px 18px'}}>
+            <div style={{font:"700 17px 'IBM Plex Sans Thai'",color:'#fff',marginBottom:14}}>{st.tally}</div>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {tally.map(tb=>(
+                <div key={tb.table} style={{background:'#1d1c1a',borderRadius:12,padding:'12px 13px'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:9}}>
+                    <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+                      <span style={{font:"600 10px 'IBM Plex Mono'",letterSpacing:'1.5px',textTransform:'uppercase',color:'#8a8077'}}>{st.table}</span>
+                      <span style={{font:"700 26px 'IBM Plex Mono'",color:'#fff',lineHeight:1}}>{tb.table}</span>
+                    </div>
+                    <div style={{font:"600 12px 'IBM Plex Sans Thai'",color:'#a79e93'}}>{tb.rounds} {st.rounds} · <span style={{color:'#e8e2d8',fontWeight:700}}>{tb.total}</span> {st.items}</div>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {Object.keys(tb.items).map(no=>(
+                      <span key={no} style={{display:'inline-flex',alignItems:'center',gap:5,background:'#2c2925',borderRadius:7,padding:'4px 8px',font:"600 12px 'IBM Plex Mono'",color:'#cfc7bd'}}>
+                        <span style={{color:'#8a8077'}}>{no}</span>×{tb.items[no]}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
+
+    </div>
+   </div>
+  </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
